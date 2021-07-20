@@ -12,8 +12,14 @@ type Aes256Cbc = Cbc<Aes256, Pkcs7>;
 
 pub fn run_encrypt(path: &str) -> Result<(), EncryptError> {
     let mut file = fs::File::open(path).map_err(EncryptError::FileError)?;
-    let password =
-        rpassword::read_password_from_tty(Some("Password: ")).map_err(EncryptError::FileError)?;
+    let password = rpassword::read_password_from_tty(Some("Enter Password: "))
+        .map_err(EncryptError::FileError)?;
+
+    let confirm_password = rpassword::read_password_from_tty(Some("Repeat password: "))
+        .map_err(EncryptError::FileError)?;
+    if confirm_password != password {
+        return Err(EncryptError::PasswordMismatch);
+    }
 
     // Generate key from password
     let mut sha256 = Sha256::new();
