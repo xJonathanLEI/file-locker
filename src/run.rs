@@ -52,7 +52,7 @@ pub fn run_encrypt(path: &str) -> Result<(), EncryptError> {
     Ok(())
 }
 
-pub fn run_decrypt(path: &str, _legacy: bool) -> Result<(), DecryptError> {
+pub fn run_decrypt(path: &str, legacy: bool) -> Result<(), DecryptError> {
     let mut file = fs::File::open(path).map_err(DecryptError::FileError)?;
     let password = rpassword::read_password_from_tty(Some("Enter Password: "))
         .map_err(DecryptError::ReadPasswordError)?;
@@ -62,13 +62,22 @@ pub fn run_decrypt(path: &str, _legacy: bool) -> Result<(), DecryptError> {
 
     // Read IV from file
     let mut iv: [u8; 16] = [0; 16];
-    file.read(&mut iv).map_err(DecryptError::FileError)?;
+    if legacy {
+        generate_legacy_iv(&mut iv);
+    } else {
+        file.read(&mut iv).map_err(DecryptError::FileError)?;
+    }
 
     let input_file_meta = file.metadata().map_err(DecryptError::FileError)?;
     let file_len: usize = input_file_meta.len().try_into().unwrap();
 
     // TODO: change to encrypt by block
-    let mut buffer = Box::new(vec![0; file_len - iv.len()]);
+    let actual_file_length = if legacy {
+        file_len
+    } else {
+        file_len - iv.len()
+    };
+    let mut buffer = Box::new(vec![0; actual_file_length]);
     if file.read(&mut buffer).map_err(DecryptError::FileError)? != buffer.len() {
         return Err(DecryptError::FileLengthMismatch);
     }
@@ -93,4 +102,13 @@ fn password_to_key(password: &str) -> [u8; 32] {
     let mut sha256 = Sha256::new();
     sha256.update(password.as_bytes());
     sha256.finalize()[..].try_into().unwrap()
+}
+
+fn generate_legacy_iv(iv: &mut [u8; 16]) {
+    let mut sha256 = Sha256::new();
+    sha256.update(b"File Locker");
+    let hash = sha256.finalize();
+
+    let iv_len = iv.len();
+    iv.copy_from_slice(&hash[..iv_len]);
 }
