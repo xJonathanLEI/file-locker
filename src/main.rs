@@ -1,8 +1,12 @@
-use clap::{Parser, Subcommand};
 use std::process;
 
+use clap::{Parser, Subcommand};
+
+use crate::subcommands::*;
+
 mod error;
-mod run;
+mod subcommands;
+mod utils;
 
 #[derive(Debug, Parser)]
 struct Cli {
@@ -18,26 +22,12 @@ enum Subcommands {
     Unlock(UnlockCommand),
 }
 
-#[derive(Debug, Parser)]
-struct LockCommand {
-    #[clap(help = "Path to file to be encrypted")]
-    file: String,
-}
-
-#[derive(Debug, Parser)]
-struct UnlockCommand {
-    #[clap(help = "Path to file to be decrypted")]
-    file: String,
-    #[clap(long, short, help = "Target file is in legacy format")]
-    legacy: bool,
-}
-
 fn main() {
     let cli = Cli::parse();
 
     match cli.command {
         Subcommands::Lock(cmd) => {
-            if let Err(err) = crate::run::run_encrypt(&cmd.file) {
+            if let Err(err) = cmd.run() {
                 eprintln!("Error running command: {:#?}", err);
                 process::exit(1);
             } else {
@@ -45,7 +35,7 @@ fn main() {
             }
         }
         Subcommands::Unlock(cmd) => {
-            if let Err(err) = crate::run::run_decrypt(&cmd.file, cmd.legacy) {
+            if let Err(err) = cmd.run() {
                 eprintln!("Error running command: {:#?}", err);
                 process::exit(1);
             } else {
