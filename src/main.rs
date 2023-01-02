@@ -1,57 +1,56 @@
-use clap::{App, Arg, SubCommand};
+use clap::{Parser, Subcommand};
 use std::process;
 
 mod error;
 mod run;
 
+#[derive(Debug, Parser)]
+struct Cli {
+    #[clap(subcommand)]
+    command: Subcommands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Subcommands {
+    #[clap(about = "Encrypt file")]
+    Lock(LockCommand),
+    #[clap(about = "Decrypt file")]
+    Unlock(UnlockCommand),
+}
+
+#[derive(Debug, Parser)]
+struct LockCommand {
+    #[clap(help = "Path to file to be encrypted")]
+    file: String,
+}
+
+#[derive(Debug, Parser)]
+struct UnlockCommand {
+    #[clap(help = "Path to file to be decrypted")]
+    file: String,
+    #[clap(long, short, help = "Target file is in legacy format")]
+    legacy: bool,
+}
+
 fn main() {
-    let file_arg = Arg::with_name("path")
-        .help("Path to file to be encrypted/decrypted")
-        .value_name("FILE")
-        .required(true);
+    let cli = Cli::parse();
 
-    let matches = App::new("File Locker")
-        .version("0.1.0")
-        .author("Jonathan LEI <xJonathan@outlook.com>")
-        .about("A simple AES-based file encryptor/decryptor")
-        .subcommand(
-            SubCommand::with_name("lock")
-                .about("Encrypt file")
-                .arg(file_arg.clone()),
-        )
-        .subcommand(
-            SubCommand::with_name("unlock")
-                .about("Decrypt file")
-                .arg(
-                    Arg::with_name("legacy")
-                        .long("legacy")
-                        .short("l")
-                        .help("Target file is in legacy format")
-                        .takes_value(false),
-                )
-                .arg(file_arg),
-        )
-        .get_matches();
-
-    // Dispatch subcommands
-    if let Some(sub_matches) = matches.subcommand_matches("lock") {
-        let path = sub_matches.value_of("path").expect("Missing value: FILE");
-
-        if let Err(err) = crate::run::run_encrypt(path) {
-            eprintln!("Error running command: {:#?}", err);
-            process::exit(1);
-        } else {
-            process::exit(0);
+    match cli.command {
+        Subcommands::Lock(cmd) => {
+            if let Err(err) = crate::run::run_encrypt(&cmd.file) {
+                eprintln!("Error running command: {:#?}", err);
+                process::exit(1);
+            } else {
+                process::exit(0);
+            }
         }
-    } else if let Some(sub_matches) = matches.subcommand_matches("unlock") {
-        let path = sub_matches.value_of("path").expect("Missing value: FILE");
-        let legacy = sub_matches.is_present("legacy");
-
-        if let Err(err) = crate::run::run_decrypt(path, legacy) {
-            eprintln!("Error running command: {:#?}", err);
-            process::exit(1);
-        } else {
-            process::exit(0);
+        Subcommands::Unlock(cmd) => {
+            if let Err(err) = crate::run::run_decrypt(&cmd.file, cmd.legacy) {
+                eprintln!("Error running command: {:#?}", err);
+                process::exit(1);
+            } else {
+                process::exit(0);
+            }
         }
     }
 }

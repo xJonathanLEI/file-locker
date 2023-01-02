@@ -1,6 +1,5 @@
 use crate::error::{DecryptError, EncryptError};
-use aes::Aes256;
-use block_modes::{block_padding::Pkcs7, BlockMode, Cbc};
+use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use sha2::{Digest, Sha256};
 use std::{
     convert::TryInto,
@@ -8,15 +7,16 @@ use std::{
     io::{Read, Write},
 };
 
-type Aes256Cbc = Cbc<Aes256, Pkcs7>;
+type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
+type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
 
 pub fn run_encrypt(path: &str) -> Result<(), EncryptError> {
     let mut file = fs::File::open(path).map_err(EncryptError::FileError)?;
-    let password = rpassword::prompt_password_stdout("Enter Password: ")
-        .map_err(EncryptError::ReadPasswordError)?;
+    let password =
+        rpassword::prompt_password("Enter Password: ").map_err(EncryptError::ReadPasswordError)?;
 
     let confirm_password =
-        rpassword::prompt_password_stdout("Repeat password: ").map_err(EncryptError::FileError)?;
+        rpassword::prompt_password("Repeat password: ").map_err(EncryptError::FileError)?;
     if confirm_password != password {
         return Err(EncryptError::PasswordMismatch);
     }
@@ -37,8 +37,8 @@ pub fn run_encrypt(path: &str) -> Result<(), EncryptError> {
         return Err(EncryptError::FileLengthMismatch);
     }
 
-    let cipher = Aes256Cbc::new_from_slices(&key, &iv).unwrap();
-    let ciphertext = cipher.encrypt_vec(&buffer);
+    let cipher = Aes256CbcEnc::new_from_slices(&key, &iv).unwrap();
+    let ciphertext = cipher.encrypt_padded_vec_mut::<Pkcs7>(&buffer);
 
     let mut tmp_file = tempfile::NamedTempFile::new().map_err(EncryptError::FileError)?;
     tmp_file.write(&iv[..]).map_err(EncryptError::FileError)?;
@@ -54,8 +54,8 @@ pub fn run_encrypt(path: &str) -> Result<(), EncryptError> {
 
 pub fn run_decrypt(path: &str, legacy: bool) -> Result<(), DecryptError> {
     let mut file = fs::File::open(path).map_err(DecryptError::FileError)?;
-    let password = rpassword::prompt_password_stdout("Enter Password: ")
-        .map_err(DecryptError::ReadPasswordError)?;
+    let password =
+        rpassword::prompt_password("Enter Password: ").map_err(DecryptError::ReadPasswordError)?;
 
     // Generate key from password
     let key: [u8; 32] = password_to_key(&password);
@@ -82,9 +82,9 @@ pub fn run_decrypt(path: &str, legacy: bool) -> Result<(), DecryptError> {
         return Err(DecryptError::FileLengthMismatch);
     }
 
-    let cipher = Aes256Cbc::new_from_slices(&key, &iv).unwrap();
+    let cipher = Aes256CbcDec::new_from_slices(&key, &iv).unwrap();
     let plaintext = cipher
-        .decrypt_vec(&buffer)
+        .decrypt_padded_vec_mut::<Pkcs7>(&buffer)
         .map_err(DecryptError::DecryptionFailed)?;
 
     let mut tmp_file = tempfile::NamedTempFile::new().map_err(DecryptError::FileError)?;

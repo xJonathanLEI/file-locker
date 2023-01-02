@@ -1,14 +1,15 @@
 [package]
 name = "file-locker"
 version = "0.1.1"
-authors = ["Jonathan LEI <xJonathan@outlook.com>"]
-edition = "2018"
+authors = ["Jonathan LEI <me@xjonathan.dev>"]
+edition = "2021"
+description = "A simple AES-based file encryptor/decryptor"
 
 [dependencies]
-clap = "2.33.3"
-rpassword = "5.0.1"
-sha2 = "0.9.5"
-aes = "0.7.4"
-getrandom = "0.2.3"
-tempfile = "3.2.0"
-block-modes = { version = "0.8.1", features = ["alloc"] }
+aes = "0.8.2"
+cbc = { version = "0.1.2", features = ["alloc"] }
+clap = { version = "4.0.32", features = ["derive"] }
+getrandom = "0.2.8"
+rpassword = "7.2.0"
+sha2 = "0.10.6"
+tempfile = "3.3.0"
