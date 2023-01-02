@@ -20,6 +20,12 @@ pub struct UnlockCommand {
     file: String,
     #[clap(long, short, help = "Target file is in legacy format")]
     legacy: bool,
+    #[clap(
+        long,
+        short,
+        help = "Print result to stdout instead of decrypting file"
+    )]
+    print: bool,
 }
 
 impl UnlockCommand {
@@ -58,13 +64,20 @@ impl UnlockCommand {
             .decrypt_padded_vec_mut::<Pkcs7>(&buffer)
             .map_err(DecryptError::DecryptionFailed)?;
 
-        let mut tmp_file = tempfile::NamedTempFile::new().map_err(DecryptError::FileError)?;
-        tmp_file
-            .write(&plaintext[..])
-            .map_err(DecryptError::FileError)?;
-        tmp_file.flush().map_err(DecryptError::FileError)?;
+        if self.print {
+            print!(
+                "{}",
+                String::from_utf8(plaintext).expect("Non utf-8 content")
+            );
+        } else {
+            let mut tmp_file = tempfile::NamedTempFile::new().map_err(DecryptError::FileError)?;
+            tmp_file
+                .write(&plaintext[..])
+                .map_err(DecryptError::FileError)?;
+            tmp_file.flush().map_err(DecryptError::FileError)?;
 
-        std::fs::copy(tmp_file.path(), &self.file).map_err(DecryptError::FileError)?;
+            std::fs::copy(tmp_file.path(), &self.file).map_err(DecryptError::FileError)?;
+        }
 
         Ok(())
     }
