@@ -13,6 +13,8 @@ type Aes256CbcEnc = cbc::Encryptor<aes::Aes256>;
 
 #[derive(Debug, Parser)]
 pub struct LockCommand {
+    #[clap(long, help = "Provide password on command line instead")]
+    password: Option<String>,
     #[clap(help = "Path to file to be encrypted")]
     file: String,
 }
@@ -20,14 +22,21 @@ pub struct LockCommand {
 impl LockCommand {
     pub fn run(&self) -> Result<(), EncryptError> {
         let mut file = fs::File::open(&self.file).map_err(EncryptError::FileError)?;
-        let password = rpassword::prompt_password("Enter Password: ")
-            .map_err(EncryptError::ReadPasswordError)?;
+        let password = match &self.password {
+            Some(password) => password.to_owned(),
+            None => {
+                let password = rpassword::prompt_password("Enter Password: ")
+                    .map_err(EncryptError::ReadPasswordError)?;
 
-        let confirm_password =
-            rpassword::prompt_password("Repeat password: ").map_err(EncryptError::FileError)?;
-        if confirm_password != password {
-            return Err(EncryptError::PasswordMismatch);
-        }
+                let confirm_password = rpassword::prompt_password("Repeat password: ")
+                    .map_err(EncryptError::FileError)?;
+                if confirm_password != password {
+                    return Err(EncryptError::PasswordMismatch);
+                }
+
+                password
+            }
+        };
 
         // Generate key from password
         let key: [u8; 32] = password_to_key(&password);

@@ -18,6 +18,8 @@ type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
 pub struct UnlockCommand {
     #[clap(help = "Path to file to be decrypted")]
     file: String,
+    #[clap(long, help = "Provide password on command line instead")]
+    password: Option<String>,
     #[clap(long, short, help = "Target file is in legacy format")]
     legacy: bool,
     #[clap(
@@ -31,8 +33,11 @@ pub struct UnlockCommand {
 impl UnlockCommand {
     pub fn run(&self) -> Result<(), DecryptError> {
         let mut file = fs::File::open(&self.file).map_err(DecryptError::FileError)?;
-        let password = rpassword::prompt_password("Enter Password: ")
-            .map_err(DecryptError::ReadPasswordError)?;
+        let password = match &self.password {
+            Some(password) => password.to_owned(),
+            None => rpassword::prompt_password("Enter Password: ")
+                .map_err(DecryptError::ReadPasswordError)?,
+        };
 
         // Generate key from password
         let key: [u8; 32] = password_to_key(&password);
